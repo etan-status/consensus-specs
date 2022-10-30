@@ -615,6 +615,17 @@ from eth2spec.bellatrix import {preset_name} as bellatrix
 '''
 
 
+    @classmethod
+    def hardcoded_ssz_dep_constants(cls) -> Dict[str, str]:
+        constants = {
+            'BLOCK_STATE_ROOT_INDEX': 'GeneralizedIndex(11)',
+            'STATE_BLOCK_ROOTS_INDEX': 'GeneralizedIndex(37)',
+            'STATE_HISTORICAL_ROOTS_INDEX': 'GeneralizedIndex(39)',
+            'HISTORICAL_BATCH_BLOCK_ROOTS_INDEX': 'GeneralizedIndex(2)',
+        }
+        return {**super().hardcoded_ssz_dep_constants(), **constants}
+
+
 #
 # EIP4844SpecBuilder
 #
