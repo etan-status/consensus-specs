@@ -34,6 +34,8 @@
 - [Light client initialization](#light-client-initialization)
   - [`initialize_light_client_store`](#initialize_light_client_store)
 - [Light client state updates](#light-client-state-updates)
+  - [`validate_light_client_finality_branch`](#validate_light_client_finality_branch)
+  - [`validate_light_client_sync_aggregate`](#validate_light_client_sync_aggregate)
   - [`validate_light_client_update`](#validate_light_client_update)
   - [`apply_light_client_update`](#apply_light_client_update)
   - [`process_light_client_store_force_update`](#process_light_client_store_force_update)
@@ -58,6 +60,7 @@ Additional documents describe how the light client sync protocol can be used:
 - [Full node](./full-node.md)
 - [Light client](./light-client.md)
 - [Networking](./p2p-interface.md)
+- [Beacon snapshot](./beacon-snapshot.md)
 
 ## Custom types
 
@@ -362,6 +365,45 @@ def initialize_light_client_store(trusted_block_root: Root,
     - **`optimistic_update: LightClientOptimisticUpdate`**: Every `optimistic_update` triggers `process_light_client_optimistic_update(store, optimistic_update, current_slot, genesis_validators_root)`.
 - `process_light_client_store_force_update` MAY be called based on use case dependent heuristics if light client sync appears stuck.
 
+### `validate_light_client_finality_branch`
+
+```python
+def validate_light_client_finality_branch(update: LightClientUpdate | LightClientFinalityUpdate) -> None:
+    # Verify that the `finality_branch`, if present, confirms `finalized_header`
+    # to match the finalized checkpoint root saved in the state of `attested_header`.
+    # Note that the genesis finalized checkpoint root is represented as a zero hash.
+    if update.finalized_header.beacon.slot == GENESIS_SLOT:
+        assert update.finalized_header == LightClientHeader()
+        finalized_root = Bytes32()
+    else:
+        assert is_valid_light_client_header(update.finalized_header)
+        finalized_root = hash_tree_root(update.finalized_header.beacon)
+    assert is_valid_normalized_merkle_branch(
+        leaf=finalized_root,
+        branch=update.finality_branch,
+        gindex=finalized_root_gindex_at_slot(update.attested_header.beacon.slot),
+        root=update.attested_header.beacon.state_root,
+    )
+```
+
+### `validate_light_client_sync_aggregate`
+
+```python
+def validate_light_client_sync_aggregate(update: LightClientUpdate | LightClientFinalityUpdate,
+                                         sync_committee: SyncCommittee,
+                                         genesis_validators_root: Root) -> None:
+    sync_aggregate = update.sync_aggregate
+    participant_pubkeys = [
+        pubkey for (bit, pubkey) in zip(sync_aggregate.sync_committee_bits, sync_committee.pubkeys)
+        if bit
+    ]
+    fork_version_slot = max(update.signature_slot, Slot(1)) - Slot(1)
+    fork_version = compute_fork_version(compute_epoch_at_slot(fork_version_slot))
+    domain = compute_domain(DOMAIN_SYNC_COMMITTEE, fork_version, genesis_validators_root)
+    signing_root = compute_signing_root(update.attested_header.beacon, domain)
+    assert bls.FastAggregateVerify(participant_pubkeys, signing_root, sync_aggregate.sync_committee_signature)
+```
+
 ### `validate_light_client_update`
 
 ```python
@@ -370,8 +412,7 @@ def validate_light_client_update(store: LightClientStore,
                                  current_slot: Slot,
                                  genesis_validators_root: Root) -> None:
     # Verify sync committee has sufficient participants
-    sync_aggregate = update.sync_aggregate
-    assert sum(sync_aggregate.sync_committee_bits) >= MIN_SYNC_COMMITTEE_PARTICIPANTS
+    assert sum(update.sync_aggregate.sync_committee_bits) >= MIN_SYNC_COMMITTEE_PARTICIPANTS
 
     # Verify update does not skip a sync committee period
     assert is_valid_light_client_header(update.attested_header)
@@ -395,24 +436,11 @@ def validate_light_client_update(store: LightClientStore,
         or update_has_next_sync_committee
     )
 
-    # Verify that the `finality_branch`, if present, confirms `finalized_header`
-    # to match the finalized checkpoint root saved in the state of `attested_header`.
-    # Note that the genesis finalized checkpoint root is represented as a zero hash.
+    # Verify finalized header, if present, corresponds to attested header
     if not is_finality_update(update):
         assert update.finalized_header == LightClientHeader()
     else:
-        if update_finalized_slot == GENESIS_SLOT:
-            assert update.finalized_header == LightClientHeader()
-            finalized_root = Bytes32()
-        else:
-            assert is_valid_light_client_header(update.finalized_header)
-            finalized_root = hash_tree_root(update.finalized_header.beacon)
-        assert is_valid_normalized_merkle_branch(
-            leaf=finalized_root,
-            branch=update.finality_branch,
-            gindex=finalized_root_gindex_at_slot(update.attested_header.beacon.slot),
-            root=update.attested_header.beacon.state_root,
-        )
+        validate_light_client_finality_branch(update)
 
     # Verify that the `next_sync_committee`, if present, actually is the next sync committee saved in the
     # state of the `attested_header`
@@ -433,15 +461,7 @@ def validate_light_client_update(store: LightClientStore,
         sync_committee = store.current_sync_committee
     else:
         sync_committee = store.next_sync_committee
-    participant_pubkeys = [
-        pubkey for (bit, pubkey) in zip(sync_aggregate.sync_committee_bits, sync_committee.pubkeys)
-        if bit
-    ]
-    fork_version_slot = max(update.signature_slot, Slot(1)) - Slot(1)
-    fork_version = compute_fork_version(compute_epoch_at_slot(fork_version_slot))
-    domain = compute_domain(DOMAIN_SYNC_COMMITTEE, fork_version, genesis_validators_root)
-    signing_root = compute_signing_root(update.attested_header.beacon, domain)
-    assert bls.FastAggregateVerify(participant_pubkeys, signing_root, sync_aggregate.sync_committee_signature)
+    validate_light_client_sync_aggregate(update, sync_committee, genesis_validators_root)
 ```
 
 ### `apply_light_client_update`

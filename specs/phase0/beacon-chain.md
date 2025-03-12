@@ -1672,6 +1672,7 @@ def process_randao_mixes_reset(state: BeaconState) -> None:
 ```
 
 #### Historical roots updates
+
 ```python
 def process_historical_roots_update(state: BeaconState) -> None:
     # Set historical root accumulator

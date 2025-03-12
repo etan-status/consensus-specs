@@ -17,7 +17,6 @@ from eth2spec.test.helpers.light_client import (
     latest_current_sync_committee_gindex,
     latest_finalized_root_gindex,
     latest_next_sync_committee_gindex,
-    latest_normalize_merkle_branch,
     upgrade_lc_header_to_new_spec,
     upgrade_lc_update_to_new_spec,
 )
@@ -256,17 +255,14 @@ def _cache_lc_data(lc_data_store, spec, state, bid, current_period_best_update, 
     # `LightClientUpdate` and `LightClientBootstrap` instances that refer to this
     # block and state.
     cached_data = CachedLightClientData(
-        current_sync_committee_branch=latest_normalize_merkle_branch(
-            lc_data_store.spec,
+        current_sync_committee_branch=lc_data_store.spec.normalize_merkle_branch(
             spec.compute_merkle_proof(state, spec.current_sync_committee_gindex_at_slot(state.slot)),
             latest_current_sync_committee_gindex(lc_data_store.spec)),
-        next_sync_committee_branch=latest_normalize_merkle_branch(
-            lc_data_store.spec,
+        next_sync_committee_branch=lc_data_store.spec.normalize_merkle_branch(
             spec.compute_merkle_proof(state, spec.next_sync_committee_gindex_at_slot(state.slot)),
             latest_next_sync_committee_gindex(lc_data_store.spec)),
         finalized_slot=spec.compute_start_slot_at_epoch(state.finalized_checkpoint.epoch),
-        finality_branch=latest_normalize_merkle_branch(
-            lc_data_store.spec,
+        finality_branch=lc_data_store.spec.normalize_merkle_branch(
             spec.compute_merkle_proof(state, spec.finalized_root_gindex_at_slot(state.slot)),
             latest_finalized_root_gindex(lc_data_store.spec)),
         current_period_best_update=current_period_best_update,

@@ -9,8 +9,6 @@
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 
 - [Introduction](#introduction)
-- [Helper functions](#helper-functions)
-  - [`normalize_merkle_branch`](#normalize_merkle_branch)
 - [Upgrading light client data](#upgrading-light-client-data)
 - [Upgrading the store](#upgrading-the-store)
 
@@ -21,21 +19,11 @@
 
 This document describes how to upgrade existing light client objects based on the [Deneb specification](../../deneb/light-client/sync-protocol.md) to Electra. This is necessary when processing pre-Electra data with a post-Electra `LightClientStore`. Note that the data being exchanged over the network protocols uses the original format.
 
-## Helper functions
-
-### `normalize_merkle_branch`
-
-```python
-def normalize_merkle_branch(branch: Sequence[Bytes32],
-                            gindex: GeneralizedIndex) -> Sequence[Bytes32]:
-    depth = floorlog2(gindex)
-    num_extra = depth - len(branch)
-    return [Bytes32()] * num_extra + [*branch]
-```
-
 ## Upgrading light client data
 
 An Electra `LightClientStore` can still process earlier light client data. In order to do so, that pre-Electra data needs to be locally upgraded to Electra before processing.
+
+These definitions use the `normalize_merkle_branch` helper function defined in the [Altair specification](../../altair/light-client/beacon-snapshot.md).
 
 ```python
 def upgrade_lc_header_to_electra(pre: deneb.LightClientHeader) -> LightClientHeader:
