@@ -427,6 +427,7 @@ def output_store_checks(spec, store, test_steps, with_viable_for_head_weights=Fa
             "root": encode_hex(store.finalized_checkpoint.root),
         },
         "proposer_boost_root": encode_hex(store.proposer_boost_root),
+        "confirmed_root": encode_hex(store.confirmed_root),
     }
 
     if with_viable_for_head_weights:
