@@ -11,6 +11,7 @@ from py_arkworks_bls12381 import G1Point as G1, G2Point as G2, GT, Scalar
 STUB_SIGNATURE = b"\x11" * 96
 STUB_PUBKEY = b"\x22" * 48
 G2_POINT_AT_INFINITY = b"\xc0" + b"\x00" * 95
+CURVE_ORDER = 0x73EDA753299D7D483339D80809A1D80553BDA402FFFE5BFEFFFFFFFF00000001
 
 ################################################################################
 # Decorators
@@ -157,7 +158,8 @@ def AggregateVerify(pubkeys, messages, signature):
 @only_with_bls(alt_return=True)
 def FastAggregateVerify(pubkeys, message, signature):
     aggregate = _aggregate_pubkey_points(pubkeys)
-    if aggregate is None:
+    # Valid pubkeys can add up to the point at infinity, which fails KeyValidate
+    if aggregate is None or aggregate == G1.identity():
         return False
     signature_point = _valid_signature_point(signature)
     if signature_point is None:

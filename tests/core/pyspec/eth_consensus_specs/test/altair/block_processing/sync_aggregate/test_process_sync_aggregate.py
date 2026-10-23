@@ -13,25 +13,30 @@ from eth_consensus_specs.test.context import (
 )
 from eth_consensus_specs.test.helpers.block import (
     build_empty_block_for_next_slot,
+    get_proposer_index_maybe,
 )
 from eth_consensus_specs.test.helpers.constants import (
     MAINNET,
     MINIMAL,
 )
+from eth_consensus_specs.test.helpers.keys import privkeys
 from eth_consensus_specs.test.helpers.state import (
     next_epoch_via_block,
+    set_negated_key,
     state_transition_and_sign_block,
     transition_to,
 )
 from eth_consensus_specs.test.helpers.sync_committee import (
     compute_aggregate_sync_committee_signature,
     compute_committee_indices,
+    compute_sync_committee_signature,
     run_successful_sync_committee_test,
     run_sync_committee_processing,
 )
 from eth_consensus_specs.test.helpers.voluntary_exits import (
     get_unslashed_exited_validators,
 )
+from eth_consensus_specs.utils import bls
 
 
 @with_altair_and_later
@@ -125,6 +130,38 @@ def test_invalid_signature_infinite_signature_with_single_participant(spec, stat
         ),
         sync_committee_signature=spec.G2_POINT_AT_INFINITY,
     )
+    yield from run_sync_committee_processing(spec, state, block, expect_exception=True)
+
+
+@with_altair_and_later
+@spec_state_test
+@always_bls
+def test_invalid_signature_infinite_signature_with_cancelling_participants(spec, state):
+    proposer_index = get_proposer_index_maybe(spec, state, state.slot + 1)
+    committee_indices = compute_committee_indices(state)
+    participant = committee_indices[0]
+    other_position = next(
+        position
+        for position, index in enumerate(committee_indices)
+        if index not in (participant, proposer_index)
+    )
+    privkey = set_negated_key(spec, state, committee_indices[other_position], participant)
+
+    block = build_empty_block_for_next_slot(spec, state)
+    block.body.sync_aggregate = spec.SyncAggregate(
+        sync_committee_bits=spec.SyncCommitteeBits(
+            data=[position in (0, other_position) for position in range(len(committee_indices))]
+        ),
+        sync_committee_signature=bls.Aggregate(
+            [
+                compute_sync_committee_signature(
+                    spec, state, block.slot - 1, key, block_root=block.parent_root
+                )
+                for key in [privkeys[participant], privkey]
+            ]
+        ),
+    )
+    assert block.body.sync_aggregate.sync_committee_signature == spec.G2_POINT_AT_INFINITY
     yield from run_sync_committee_processing(spec, state, block, expect_exception=True)
 
 

@@ -9,7 +9,9 @@ from eth_consensus_specs.test.helpers.block import (
     transition_unsigned_block,
 )
 from eth_consensus_specs.test.helpers.forks import is_post_altair
+from eth_consensus_specs.test.helpers.keys import privkeys
 from eth_consensus_specs.test.helpers.voluntary_exits import get_unslashed_exited_validators
+from eth_consensus_specs.utils import bls
 from eth_consensus_specs.utils.ssz.bytes import Bytes32
 
 
@@ -186,6 +188,24 @@ def get_validator_index_by_pubkey(state, pubkey):
         (i for i, validator in enumerate(state.validators) if validator.pubkey == pubkey), None
     )
     return index
+
+
+def set_negated_key(spec, state, validator_index, other_index):
+    """
+    Give ``validator_index`` the negation of the key of ``other_index``, so that
+    their public keys add up to the point at infinity, including in the sync
+    committees, and return its private key.
+    """
+    privkey = bls.CURVE_ORDER - privkeys[other_index]
+    pubkey = bls.SkToPk(privkey)
+    if is_post_altair(spec):
+        for sync_committee in [state.current_sync_committee, state.next_sync_committee]:
+            for position in range(len(sync_committee.pubkeys)):
+                if sync_committee.pubkeys[position] == state.validators[validator_index].pubkey:
+                    sync_committee.pubkeys[position] = pubkey
+            sync_committee.aggregate_pubkey = bls.AggregatePKs(sync_committee.pubkeys)
+    state.validators[validator_index].pubkey = pubkey
+    return privkey
 
 
 def advance_finality_to(spec, state, epoch):

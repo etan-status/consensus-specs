@@ -10,16 +10,20 @@ from eth_consensus_specs.test.context import (
 )
 from eth_consensus_specs.test.helpers.attestations import (
     compute_max_inclusion_slot,
+    get_attestation_signature,
     get_valid_attestation,
     run_attestation_processing,
     sign_aggregate_attestation,
     sign_attestation,
 )
+from eth_consensus_specs.test.helpers.keys import privkeys
 from eth_consensus_specs.test.helpers.state import (
     next_epoch_via_block,
     next_slots,
+    set_negated_key,
     transition_to_slot_via_block,
 )
+from eth_consensus_specs.utils import bls
 
 
 @with_all_phases
@@ -84,6 +88,27 @@ def test_invalid_empty_participants_seemingly_valid_sig(spec, state):
     )  # 0 participants
     # Special BLS value, valid for zero pubkeys on some (but not all) BLS implementations.
     attestation.signature = spec.BLSSignature(b"\xc0" + b"\x00" * 95)
+    next_slots(spec, state, spec.MIN_ATTESTATION_INCLUSION_DELAY)
+
+    yield from run_attestation_processing(spec, state, attestation, valid=False)
+
+
+@with_all_phases
+@spec_state_test
+@always_bls
+def test_invalid_cancelling_participants_infinite_sig(spec, state):
+    attestation = get_valid_attestation(
+        spec, state, filter_participant_set=lambda comm: set(sorted(comm)[:2])
+    )
+    participant, other = sorted(spec.get_attesting_indices(state, attestation))
+    privkey = set_negated_key(spec, state, other, participant)
+    attestation.signature = bls.Aggregate(
+        [
+            get_attestation_signature(spec, state, attestation.data, privkeys[participant]),
+            get_attestation_signature(spec, state, attestation.data, privkey),
+        ]
+    )
+    assert attestation.signature == bls.G2_POINT_AT_INFINITY
     next_slots(spec, state, spec.MIN_ATTESTATION_INCLUSION_DELAY)
 
     yield from run_attestation_processing(spec, state, attestation, valid=False)

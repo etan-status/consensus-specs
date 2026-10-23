@@ -149,3 +149,20 @@ def test_eth_fast_aggregate_verify_infinity_pubkey(spec):
     yield from _run_eth_fast_aggregate_verify(
         spec, pubkeys_with_infinity, SAMPLE_MESSAGE, aggregate_signature, expected_result=False
     )
+
+
+@manifest(preset_name="general", suite_name="bls")
+@only_generator("too slow")
+@with_phases([ALTAIR])
+@spec_test
+@single_phase
+def test_eth_fast_aggregate_verify_infinity_aggregate_pubkey(spec):
+    # The pubkeys of `privkey` and `CURVE_ORDER - privkey` add up to the point at infinity
+    privkeys = [PRIVKEYS[0], bls.CURVE_ORDER - PRIVKEYS[0]]
+    pubkeys = [bls.SkToPk(privkey) for privkey in privkeys]
+    signatures = [bls.Sign(privkey, SAMPLE_MESSAGE) for privkey in privkeys]
+    aggregate_signature = bls.Aggregate(signatures)
+    assert aggregate_signature == G2_POINT_AT_INFINITY
+    yield from _run_eth_fast_aggregate_verify(
+        spec, pubkeys, SAMPLE_MESSAGE, aggregate_signature, expected_result=False
+    )
