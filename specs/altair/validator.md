@@ -300,6 +300,8 @@ def process_sync_committee_contributions(
         signatures.append(contribution.signature)
 
     sync_aggregate.sync_committee_signature = bls.Aggregate(signatures)
+    if sync_aggregate.sync_committee_signature == G2_POINT_AT_INFINITY:
+        sync_aggregate.sync_committee_bits = SyncCommitteeBits()
 
     block.body.sync_aggregate = sync_aggregate
 ```
@@ -518,6 +520,9 @@ produce an aggregate `BLSSignature`.
 The collection of input signatures should include one signature per validator
 who had a bit set in the `aggregation_bits` bitfield, with repeated signatures
 if one validator maps to multiple indices within the subcommittee.
+
+The validator MUST NOT broadcast a contribution whose signature is
+`G2_POINT_AT_INFINITY`.
 
 ##### Broadcast sync committee contribution
 

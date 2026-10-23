@@ -768,7 +768,9 @@ Set `aggregate_attestation.signature = aggregate_signature` where
 ```python
 def get_aggregate_signature(attestations: Sequence[Attestation]) -> BLSSignature:
     signatures = [attestation.signature for attestation in attestations]
-    return bls.Aggregate(signatures)
+    aggregate_signature = bls.Aggregate(signatures)
+    assert aggregate_signature != bls.G2_POINT_AT_INFINITY
+    return aggregate_signature
 ```
 
 #### Broadcast aggregate

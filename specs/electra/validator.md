@@ -130,6 +130,7 @@ def compute_on_chain_aggregate(network_aggregates: Sequence[Attestation]) -> Att
             aggregation_bits.append(b)
 
     signature = bls.Aggregate([aggregate.signature for aggregate in aggregates])
+    assert signature != G2_POINT_AT_INFINITY
 
     committee_indices = [
         get_committee_indices(aggregate.committee_bits)[0] for aggregate in aggregates
