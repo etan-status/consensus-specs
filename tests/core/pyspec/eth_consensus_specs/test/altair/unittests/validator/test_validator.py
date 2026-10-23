@@ -127,6 +127,42 @@ def test_process_sync_committee_contributions(spec, state):
 
 
 @with_altair_and_later
+@with_presets([MINIMAL], reason="too slow")
+@spec_state_test
+@always_bls
+def test_process_sync_committee_contributions_cancelling_participants(spec, state):
+    # skip over slots at genesis
+    transition_to(spec, state, state.slot + 3)
+
+    block = build_empty_block(spec, state)
+    previous_slot = state.slot - 1
+    target_block_root = spec.get_block_root_at_slot(state, previous_slot)
+    aggregation_bits = spec.SyncSubcommitteeBits()
+    aggregation_bits[0] = True
+    signature = _get_sync_committee_signature(spec, state, previous_slot, target_block_root, 0, 0)
+
+    contributions = [
+        spec.SyncCommitteeContribution(
+            slot=block.slot,
+            beacon_block_root=target_block_root,
+            subcommittee_index=subcommittee_index,
+            aggregation_bits=aggregation_bits,
+            signature=contribution_signature,
+        )
+        for subcommittee_index, contribution_signature in [
+            (0, signature),
+            (1, bls.G2_to_bytes96(bls.neg(bls.bytes96_to_G2(signature)))),
+        ]
+    ]
+
+    spec.process_sync_committee_contributions(block, set(contributions))
+
+    assert not any(block.body.sync_aggregate.sync_committee_bits)
+    assert block.body.sync_aggregate.sync_committee_signature == spec.G2_POINT_AT_INFINITY
+    spec.process_block(state, block)
+
+
+@with_altair_and_later
 @spec_state_test
 @always_bls
 def test_get_sync_committee_message(spec, state):

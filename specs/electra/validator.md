@@ -118,7 +118,7 @@ proposer should run the following function to construct an on chain final
 aggregate from a list of network aggregates with equal `AttestationData`:
 
 ```python
-def compute_on_chain_aggregate(network_aggregates: Sequence[Attestation]) -> Attestation:
+def compute_on_chain_aggregate(network_aggregates: Sequence[Attestation]) -> Attestation | None:
     aggregates = sorted(
         network_aggregates, key=lambda a: get_committee_indices(a.committee_bits)[0]
     )
@@ -129,7 +129,9 @@ def compute_on_chain_aggregate(network_aggregates: Sequence[Attestation]) -> Att
         for b in a.aggregation_bits:
             aggregation_bits.append(b)
 
-    signature = bls.Aggregate([aggregate.signature for aggregate in aggregates])
+    signature = bls_aggregate_signatures([aggregate.signature for aggregate in aggregates])
+    if signature is None:
+        return None
 
     committee_indices = [
         get_committee_indices(aggregate.committee_bits)[0] for aggregate in aggregates
@@ -144,6 +146,9 @@ def compute_on_chain_aggregate(network_aggregates: Sequence[Attestation]) -> Att
         committee_bits=CommitteeBits(data=committee_bits),
     )
 ```
+
+If `compute_on_chain_aggregate` returns `None`, the proposer MUST NOT include
+the consolidated aggregate.
 
 #### Deposits
 

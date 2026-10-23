@@ -299,7 +299,11 @@ def process_sync_committee_contributions(
                 sync_aggregate.sync_committee_bits[participant_index] = Boolean(True)
         signatures.append(contribution.signature)
 
-    sync_aggregate.sync_committee_signature = bls.Aggregate(signatures)
+    signature = bls_aggregate_signatures(signatures)
+    if signature is None:
+        sync_aggregate = SyncAggregate(sync_committee_signature=G2_POINT_AT_INFINITY)
+    else:
+        sync_aggregate.sync_committee_signature = signature
 
     block.body.sync_aggregate = sync_aggregate
 ```
@@ -512,8 +516,9 @@ such that multiple bits are set for a single `SyncCommitteeMessage`.
 
 Set `contribution.signature = aggregate_signature` where `aggregate_signature`
 is obtained by assembling the appropriate collection of `BLSSignature`s from the
-set of `sync_committee_messages` and using the `bls.Aggregate()` function to
-produce an aggregate `BLSSignature`.
+set of `sync_committee_messages` and using the `bls_aggregate_signatures()`
+function to produce an aggregate `BLSSignature`. If it returns `None`, the
+validator MUST NOT broadcast the contribution.
 
 The collection of input signatures should include one signature per validator
 who had a bit set in the `aggregation_bits` bitfield, with repeated signatures

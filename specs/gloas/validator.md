@@ -244,6 +244,9 @@ construct the `payload_attestations` field in `BeaconBlockBody`:
   `aggregation_bits` field by using the relative position of the validator
   indices with respect to the PTC that is obtained from
   `get_ptc(state, Slot(block_slot - 1))`.
+- The proposer aggregates the signatures of a `PayloadAttestation` with
+  `bls_aggregate_signatures`. If it returns `None`, the proposer MUST NOT
+  include the `PayloadAttestation`.
 
 ##### Parent execution requests
 

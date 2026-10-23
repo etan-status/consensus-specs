@@ -762,14 +762,33 @@ Let `aggregate_attestation.aggregation_bits` be an `AggregationBits` of length
 
 ##### Aggregate signature
 
+Signatures are aggregated with `bls_aggregate_signatures`:
+
+```python
+def bls_aggregate_signatures(signatures: Sequence[BLSSignature]) -> BLSSignature | None:
+    """
+    Wrapper to ``bls.Aggregate`` returning ``None`` for an aggregate at the
+    point at infinity, which ``bls.FastAggregateVerify`` rejects. Valid
+    signatures on a shared message add up to it when their signers' public keys
+    do, e.g., ``P`` and ``-P``.
+    """
+    signature = bls.Aggregate(signatures)
+    if signature == bls.G2_POINT_AT_INFINITY:
+        return None
+    return signature
+```
+
 Set `aggregate_attestation.signature = aggregate_signature` where
 `aggregate_signature` is obtained from:
 
 ```python
-def get_aggregate_signature(attestations: Sequence[Attestation]) -> BLSSignature:
+def get_aggregate_signature(attestations: Sequence[Attestation]) -> BLSSignature | None:
     signatures = [attestation.signature for attestation in attestations]
-    return bls.Aggregate(signatures)
+    return bls_aggregate_signatures(signatures)
 ```
+
+If `aggregate_signature` is `None`, the validator MUST NOT broadcast the
+aggregate.
 
 #### Broadcast aggregate
 

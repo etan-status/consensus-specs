@@ -482,6 +482,22 @@ def test_get_aggregate_signature(spec, state):
     assert bls.FastAggregateVerify(attesting_pubkeys, signing_root, signature)
 
 
+@with_phases([PHASE0])
+@spec_state_test
+@always_bls
+def test_get_aggregate_signature_cancelling_participants(spec, state):
+    attestation_data = build_attestation_data(spec, state, slot=state.slot, index=0)
+    signature = spec.get_attestation_signature(state, attestation_data, privkeys[0])
+    attestations = [
+        spec.Attestation(data=attestation_data, signature=signature),
+        spec.Attestation(
+            data=attestation_data,
+            signature=bls.G2_to_bytes96(bls.neg(bls.bytes96_to_G2(signature))),
+        ),
+    ]
+    assert spec.get_aggregate_signature(attestations) is None
+
+
 @with_all_phases
 @spec_state_test
 @always_bls
